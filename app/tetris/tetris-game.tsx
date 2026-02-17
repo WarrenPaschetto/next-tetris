@@ -28,7 +28,7 @@ export default function TetrisGame() {
                 // otherwise, just move piece down
                 return { ...prev, y: nextY };
             });
-        }, 500);
+        }, 250);
 
         return () => clearInterval(id);
     }, [board]);
