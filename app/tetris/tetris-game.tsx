@@ -7,6 +7,7 @@ import type { Board, Cell } from "./game/types";
 import { spawnPiece } from "./game/pieces";
 import { collides } from "./game/collision";
 import { merge } from "./game/merge";
+import { rotateShape } from "./game/rotate";
 
 export default function TetrisGame() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -31,6 +32,43 @@ export default function TetrisGame() {
         }, 250);
 
         return () => clearInterval(id);
+    }, [board]);
+
+    // Handle user input for moving left/right and rotating
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "ArrowLeft") {
+                setPiece((prev) => {
+                    const nextX = prev.x - 1;
+                    if (!collides(board, prev, nextX, prev.y)) {
+                        return { ...prev, x: nextX };
+                    }
+                    return prev;
+                });
+            } else if (e.key === "ArrowRight") {
+                setPiece((prev) => {
+                    const nextX = prev.x + 1;
+                    if (!collides(board, prev, nextX, prev.y)) {
+                        return { ...prev, x: nextX };
+                    }
+                    return prev;
+                });
+            } else if (e.key === "ArrowUp") {   // rotate piece
+                setPiece((prev) => {
+                    const rotatedShape = rotateShape(prev.shape);
+                    const rotatedPiece = { ...prev, shape: rotatedShape };
+
+                    // Check if the rotated piece collides at the current position
+                    if (!collides(board, rotatedPiece, prev.x, prev.y)) {
+                        return rotatedPiece; // If no collision, update to the rotated piece
+                    }
+                    return prev; // Otherwise, keep the original piece
+                });
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
     }, [board]);
 
     // draw loop
