@@ -13,8 +13,9 @@ export default function TetrisGame() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [board, setBoard] = useState<Board>(() => createBoard()); // () => createBoard() ensures the board is only created once on first render
     const [piece, setPiece] = useState(() => spawnPiece()); // spawn the first piece
+    const [speed, setSpeed] = useState(250); // initial speed (ms per drop)
 
-    // Game loop: move piece down every 500ms
+    // Game loop: move piece down on an interval determined by `speed`
     useEffect(() => {
         const id = setInterval(() => {
             setPiece((prev) => {
@@ -29,12 +30,12 @@ export default function TetrisGame() {
                 // otherwise, just move piece down
                 return { ...prev, y: nextY };
             });
-        }, 250);
+        }, speed);
 
         return () => clearInterval(id);
-    }, [board]);
+    }, [board, speed]);
 
-    // Handle user input for moving left/right and rotating
+    // Handle user input for moving left/right, rotating, and soft drop
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "ArrowLeft") {
@@ -64,11 +65,23 @@ export default function TetrisGame() {
                     }
                     return prev; // Otherwise, keep the original piece
                 });
+            } else if (e.key === "ArrowDown") { // start soft drop
+                setSpeed(50); // faster interval while key is held
+            }
+        };
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === "ArrowDown") {
+                setSpeed(250); // restore normal speed
             }
         };
 
         window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
+        window.addEventListener("keyup", handleKeyUp);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+            window.removeEventListener("keyup", handleKeyUp);
+        };
     }, [board]);
 
     // draw loop
