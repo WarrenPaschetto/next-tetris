@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CELL, COLS, ROWS } from "./game/constants";
+import { CELL, COLS, ROWS, PIECE_COLORS } from "./game/constants";
 import { createBoard } from "./game/board";
 import type { Board, Cell } from "./game/types";
 import { spawnPiece } from "./game/pieces";
 import { collides } from "./game/collision";
 import { merge } from "./game/merge";
 import { rotateShape } from "./game/rotate";
+import { drawBlock } from "./game/draw-block";
 
 export default function TetrisGame() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -117,15 +118,15 @@ export default function TetrisGame() {
         // draw board...
         for (let y = 0; y < ROWS; y++) {
             for (let x = 0; x < COLS; x++) {
-                if (board[y][x] !== 0) {
-                    ctx.fillStyle = "#4ade80";
-                    ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+                const v = board[y][x] as Cell; // cast to Cell type for better readability
+                if (v !== 0) {
+                    const color = PIECE_COLORS[v] || "#9ca3af"; // get color for the cell value, default to gray if not found
+                    drawBlock(ctx, x * CELL, y * CELL, CELL, color); // draw the block with the appropriate color
                 }
             }
         }
 
         // draw the current falling piece on top
-        ctx.fillStyle = "#60a5fa"; // temporary color for the piece
         for (let r = 0; r < piece.shape.length; r++) {
             for (let c = 0; c < piece.shape[r].length; c++) {
                 if (piece.shape[r][c] === 0) continue;
@@ -133,7 +134,8 @@ export default function TetrisGame() {
                 const x = (piece.x + c) * CELL;
                 const y = (piece.y + r) * CELL;
 
-                ctx.fillRect(x, y, CELL, CELL);
+                const color = PIECE_COLORS[piece.id] || "#9ca3af"; // get color for the piece ID, default to gray if not found
+                drawBlock(ctx, x, y, CELL, color); // draw the block with the appropriate color
             }
         }
 
