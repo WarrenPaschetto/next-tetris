@@ -1,28 +1,50 @@
 import type { Board, Piece, Cell } from "./types";
 
-export function merge(board: Board, piece: Piece): Board {
-    const next: Board = board.map(row => [...row]) as Board; // deep copy of the board
+type MergeResult = {
+    board: Board;
+    linesCleared: number;
+    cellsRemoved: number;   // total cells deleted (row clears)
+    scoreDelta: number;     // how much to add to score this merge
+};
 
+export function merge(
+    board: Board,
+    piece: Piece,
+    pointsPerCell = 1
+): MergeResult {
+    // 1) Copy board
+    const next: Board = board.map(row => [...row]) as Board;
+
+    // 2) Paint entire piece onto the copied board
     for (let r = 0; r < piece.shape.length; r++) {
         for (let c = 0; c < piece.shape[r].length; c++) {
-            if (piece.shape[r][c] === 0) continue; // skip empty cells in the piece
+            if (piece.shape[r][c] === 0) continue;
 
-            // calculate the corresponding position on the board
             const y = piece.y + r;
             const x = piece.x + c;
 
-            if (y >= 0) { // only merge if within the visible board
-                next[y][x] = piece.id as Cell; // set the cell to the piece's id (1-7)
-            }
+            if (y < 0) continue;
 
-            // if the row is completely filled after merging, clear it
-            if (y >= 0 && next[y].every(cell => cell !== 0)) {
-                next.splice(y, 1); // remove the filled row
-                next.unshift(Array(next[0].length).fill(0) as Cell[]); // add an empty row at the top
-            }
+            // Optional safety guard
+            if (y >= next.length || x < 0 || x >= next[0].length) continue;
+
+            next[y][x] = piece.id as Cell;
         }
     }
 
+    // 3) Clear full lines in one pass
+    const width = next[0].length;
 
-    return next;
+    const keptRows = next.filter(row => row.some(cell => cell === 0)) as Board;
+    const linesCleared = next.length - keptRows.length;
+
+    const emptyRow = () => Array(width).fill(0) as Cell[];
+    for (let i = 0; i < linesCleared; i++) {
+        keptRows.unshift(emptyRow());
+    }
+
+    const cellsRemoved = linesCleared * width;
+    const scoreDelta = cellsRemoved * pointsPerCell;
+
+    return { board: keptRows, linesCleared, cellsRemoved, scoreDelta };
 }
