@@ -14,8 +14,15 @@ export function merge(board: Board, piece: Piece): Board {
             if (y >= 0) { // only merge if within the visible board
                 next[y][x] = piece.id as Cell; // set the cell to the piece's id (1-7)
             }
+
+            // if the row is completely filled after merging, clear it
+            if (y >= 0 && next[y].every(cell => cell !== 0)) {
+                next.splice(y, 1); // remove the filled row
+                next.unshift(Array(next[0].length).fill(0) as Cell[]); // add an empty row at the top
+            }
         }
     }
+
 
     return next;
 }
