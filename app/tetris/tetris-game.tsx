@@ -3,107 +3,144 @@
 import { useEffect, useRef, useState } from "react";
 import { CELL, COLS, ROWS, PIECE_COLORS } from "./game/constants";
 import { createBoard } from "./game/board";
-import type { Board, Cell } from "./game/types";
+import type { Board, Piece } from "./game/types";
 import { spawnPiece } from "./game/pieces";
 import { collides } from "./game/collision";
 import { merge } from "./game/merge";
 import { rotateShape } from "./game/rotate";
 import { drawBlock } from "./game/draw-block";
 
+const BLOCKED_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "]);
+
+const canDraw = (img?: HTMLImageElement) =>
+    !!img && img.complete && img.naturalWidth > 0;
+
 export default function TetrisGame() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-    const [board, setBoard] = useState<Board>(() => createBoard()); // () => createBoard() ensures the board is only created once on first render
-    const [piece, setPiece] = useState(() => spawnPiece()); // spawn the first piece
-    const [speed, setSpeed] = useState(250); // initial speed (ms per drop)
+    const [board, setBoard] = useState<Board>(() => createBoard());
+    const [piece, setPiece] = useState<Piece>(() => spawnPiece());
+    const [speed, setSpeed] = useState(250);
     const [score, setScore] = useState(0);
 
-    // Block certain keys from scrolling the page when the game is focused
-    const BLOCKED_KEYS = new Set([
-        "ArrowLeft",
-        "ArrowRight",
-        "ArrowUp",
-        "ArrowDown",
-        " ",        // Spacebar
-    ]);
-
-    // Game loop: move piece down on an interval determined by `speed`
+    // Keep latest state in refs so interval + key handlers never go stale
+    const boardRef = useRef(board);
+    const pieceRef = useRef(piece);
     useEffect(() => {
-        const id = setInterval(() => {
+        boardRef.current = board;
+    }, [board]);
+    useEffect(() => {
+        pieceRef.current = piece;
+    }, [piece]);
+
+    // Sprites
+    const spritesRef = useRef<Record<number, HTMLImageElement>>({});
+    const spritesReadyRef = useRef(false);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const ids = [1, 2, 3, 4, 5, 6, 7];
+        const images: Record<number, HTMLImageElement> = {};
+        let done = 0;
+
+        ids.forEach((id) => {
+            const img = new Image();
+            img.src = `/sprites/${id}.png`;
+
+            img.onload = () => {
+                done++;
+                images[id] = img;
+                if (!cancelled && done === ids.length) {
+                    spritesRef.current = images;
+                    spritesReadyRef.current = true;
+                }
+            };
+
+            img.onerror = () => {
+                done++;
+                // IMPORTANT: don't store broken images
+                if (!cancelled && done === ids.length) {
+                    spritesRef.current = images; // only the ones that loaded
+                    spritesReadyRef.current = true;
+                }
+            };
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    // Game loop
+    useEffect(() => {
+        const id = window.setInterval(() => {
+            const b = boardRef.current;
             setPiece((prev) => {
                 const nextY = prev.y + 1;
 
-                // if moving down collides, lock and spawn new piece
-                if (collides(board, prev, prev.x, nextY)) {
-                    setBoard((b) => {
-                        const result = merge(b, prev, 1); // 1 point per cell removed
+                if (collides(b, prev, prev.x, nextY)) {
+                    setBoard((currentBoard) => {
+                        const result = merge(currentBoard, prev, 1); // 1 point per removed cell
                         setScore((s) => s + result.scoreDelta);
                         return result.board;
                     });
-                    return spawnPiece(); // spawn new piece
+                    return spawnPiece();
                 }
 
-                // otherwise, just move piece down
                 return { ...prev, y: nextY };
             });
         }, speed);
 
-        return () => clearInterval(id);
-    }, [board, speed]);
+        return () => window.clearInterval(id);
+    }, [speed]);
 
-    // Handle user input for moving left/right, rotating, and soft drop
+    // Input
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (BLOCKED_KEYS.has(e.key)) e.preventDefault(); // prevent arrow keys and spacebar from scrolling the page
+            if (BLOCKED_KEYS.has(e.key)) e.preventDefault();
+
+            const b = boardRef.current;
 
             if (e.key === "ArrowLeft") {
                 setPiece((prev) => {
                     const nextX = prev.x - 1;
-                    if (!collides(board, prev, nextX, prev.y)) {
-                        return { ...prev, x: nextX };
-                    }
+                    if (!collides(b, prev, nextX, prev.y)) return { ...prev, x: nextX };
                     return prev;
                 });
             } else if (e.key === "ArrowRight") {
                 setPiece((prev) => {
                     const nextX = prev.x + 1;
-                    if (!collides(board, prev, nextX, prev.y)) {
-                        return { ...prev, x: nextX };
-                    }
+                    if (!collides(b, prev, nextX, prev.y)) return { ...prev, x: nextX };
                     return prev;
                 });
-            } else if (e.key === "ArrowUp") {   // rotate piece
+            } else if (e.key === "ArrowUp") {
                 setPiece((prev) => {
                     const rotatedShape = rotateShape(prev.shape);
                     const rotatedPiece = { ...prev, shape: rotatedShape };
-
-                    // Check if the rotated piece collides at the current position
-                    if (!collides(board, rotatedPiece, prev.x, prev.y)) {
-                        return rotatedPiece; // If no collision, update to the rotated piece
-                    }
-                    return prev; // Otherwise, keep the original piece
+                    if (!collides(b, rotatedPiece, prev.x, prev.y)) return rotatedPiece;
+                    return prev;
                 });
-            } else if (e.key === "ArrowDown") { // start soft drop
-                setSpeed(50); // faster interval while key is held
+            } else if (e.key === "ArrowDown") {
+                setSpeed(50);
             }
         };
 
         const handleKeyUp = (e: KeyboardEvent) => {
             if (BLOCKED_KEYS.has(e.key)) e.preventDefault();
-            if (e.key === "ArrowDown") {
-                setSpeed(250); // restore normal speed
-            }
+            if (e.key === "ArrowDown") setSpeed(250);
         };
 
-        window.addEventListener("keydown", handleKeyDown, { passive: false }); // passive: false allows us to call e.preventDefault() in the handler
+        window.addEventListener("keydown", handleKeyDown, { passive: false });
         window.addEventListener("keyup", handleKeyUp, { passive: false });
+
         return () => {
             window.removeEventListener("keydown", handleKeyDown);
             window.removeEventListener("keyup", handleKeyUp);
         };
-    }, [board]);
+    }, []);
 
-    // draw loop
+    // Draw
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -111,35 +148,45 @@ export default function TetrisGame() {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        // draw background
+        // background
         ctx.fillStyle = "#111";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // draw board...
+        const sprites = spritesRef.current;
+
+        // board
         for (let y = 0; y < ROWS; y++) {
             for (let x = 0; x < COLS; x++) {
-                const v = board[y][x] as Cell; // cast to Cell type for better readability
-                if (v !== 0) {
-                    const color = PIECE_COLORS[v] || "#9ca3af"; // get color for the cell value, default to gray if not found
-                    drawBlock(ctx, x * CELL, y * CELL, CELL, color); // draw the block with the appropriate color
+                const v = board[y][x];
+                if (v === 0) continue;
+
+                const img = sprites[v];
+                if (spritesReadyRef.current && canDraw(img)) {
+                    ctx.drawImage(img, x * CELL, y * CELL, CELL, CELL);
+                } else {
+                    drawBlock(ctx, x * CELL, y * CELL, CELL, PIECE_COLORS[v] ?? "#9ca3af");
                 }
             }
         }
 
-        // draw the current falling piece on top
+        // falling piece
+        const img = sprites[piece.id];
         for (let r = 0; r < piece.shape.length; r++) {
             for (let c = 0; c < piece.shape[r].length; c++) {
                 if (piece.shape[r][c] === 0) continue;
 
-                const x = (piece.x + c) * CELL;
-                const y = (piece.y + r) * CELL;
+                const dx = (piece.x + c) * CELL;
+                const dy = (piece.y + r) * CELL;
 
-                const color = PIECE_COLORS[piece.id] || "#9ca3af"; // get color for the piece ID, default to gray if not found
-                drawBlock(ctx, x, y, CELL, color); // draw the block with the appropriate color
+                if (spritesReadyRef.current && canDraw(img)) {
+                    ctx.drawImage(img, dx, dy, CELL, CELL);
+                } else {
+                    drawBlock(ctx, dx, dy, CELL, PIECE_COLORS[piece.id] ?? "#9ca3af");
+                }
             }
         }
 
-        // draw grid lines
+        // grid lines (optional)
         ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
         for (let x = 0; x <= COLS; x++) {
             ctx.beginPath();
@@ -147,7 +194,6 @@ export default function TetrisGame() {
             ctx.lineTo(x * CELL, ROWS * CELL);
             ctx.stroke();
         }
-
         for (let y = 0; y <= ROWS; y++) {
             ctx.beginPath();
             ctx.moveTo(0, y * CELL);
@@ -158,8 +204,7 @@ export default function TetrisGame() {
 
     return (
         <div style={{ display: "grid", gap: 12 }}>
-            {/* show score */}
-            <div style={{ color: "black", fontFamily: "system-ui", fontSize: 16 }}>
+            <div style={{ color: "#e5e7eb", fontFamily: "system-ui", fontSize: 16 }}>
                 Score: <strong>{score}</strong>
             </div>
 
@@ -167,7 +212,7 @@ export default function TetrisGame() {
                 ref={canvasRef}
                 width={COLS * CELL}
                 height={ROWS * CELL}
-                style={{ border: "1px solid #333", borderRadius: 8 }}
+                style={{ border: "1px solid #333", borderRadius: 8, display: "block" }}
             />
         </div>
     );
