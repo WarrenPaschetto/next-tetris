@@ -9,6 +9,7 @@ import { collides } from "./game/collision";
 import { merge } from "./game/merge";
 import { rotateShape } from "./game/rotate";
 import { drawBlock } from "./game/draw-block";
+import { makeStarfield } from "./game/starfield";
 
 const BLOCKED_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "]);
 
@@ -18,10 +19,19 @@ const canDraw = (img?: HTMLImageElement) =>
 export default function TetrisGame() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+    const bgRef = useRef<HTMLCanvasElement | null>(null);
+
     const [board, setBoard] = useState<Board>(() => createBoard());
     const [piece, setPiece] = useState<Piece>(() => spawnPiece());
     const [speed, setSpeed] = useState(250);
     const [score, setScore] = useState(0);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        bgRef.current = makeStarfield(canvas.width, canvas.height);
+    }, []);
 
     // Keep latest state in refs so interval + key handlers never go stale
     const boardRef = useRef(board);
@@ -148,9 +158,14 @@ export default function TetrisGame() {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        // background
-        ctx.fillStyle = "#111";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // draw background (starfield)
+        const bg = bgRef.current;
+        if (bg) ctx.drawImage(bg, 0, 0);
+        else {
+            ctx.fillStyle = "#111";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
 
         const sprites = spritesRef.current;
 
@@ -204,7 +219,7 @@ export default function TetrisGame() {
 
     return (
         <div style={{ display: "grid", gap: 12 }}>
-            <div style={{ color: "#e5e7eb", fontFamily: "system-ui", fontSize: 16 }}>
+            <div style={{ color: "black", fontFamily: "system-ui", fontSize: 16 }}>
                 Score: <strong>{score}</strong>
             </div>
 
