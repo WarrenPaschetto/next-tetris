@@ -18,20 +18,71 @@ const canDraw = (img?: HTMLImageElement) =>
 
 export default function TetrisGame() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
     const bgRef = useRef<HTMLCanvasElement | null>(null);
+    const musicRef = useRef<HTMLAudioElement | null>(null);
 
     const [board, setBoard] = useState<Board>(() => createBoard());
     const [piece, setPiece] = useState<Piece>(() => spawnPiece());
     const [speed, setSpeed] = useState(250);
     const [score, setScore] = useState(0);
+    const [musicOn, setMusicOn] = useState(false);
 
+    // Generate starfield background once on mount
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
         bgRef.current = makeStarfield(canvas.width, canvas.height);
     }, []);
+
+    // Setup music
+    useEffect(() => {
+        const audio = new Audio("/audio/3.mp3");
+        audio.loop = true;
+        audio.volume = 0.35;
+        musicRef.current = audio;
+
+        return () => {
+            audio.pause();
+            audio.currentTime = 0;
+            musicRef.current = null;
+        };
+    }, []);
+
+    // Toggle music on/off
+    const toggleMusic = async () => {
+        const audio = musicRef.current;
+        if (!audio) return;
+
+        try {
+            if (musicOn) {
+                audio.pause();
+                setMusicOn(false);
+            } else {
+                await audio.play();
+                setMusicOn(true);
+            }
+        } catch (err) {
+            console.error("Could not play audio:", err);
+        }
+    };
+
+    // Pause when tab hidden, resume when visible (if music is on)
+    useEffect(() => {
+        const onVisibilityChange = () => {
+            const audio = musicRef.current;
+            if (!audio) return;
+
+            if (document.hidden) {
+                audio.pause();
+            } else if (musicOn) {
+                audio.play().catch(() => { });
+            }
+        };
+
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+    }, [musicOn]);
 
     // Keep latest state in refs so interval + key handlers never go stale
     const boardRef = useRef(board);
@@ -110,6 +161,14 @@ export default function TetrisGame() {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (BLOCKED_KEYS.has(e.key)) e.preventDefault();
 
+            // Start music on first key press if it's not already playing
+            const audio = musicRef.current;
+            if (audio && !musicOn) {
+                audio.play()
+                    .then(() => setMusicOn(true))
+                    .catch((err) => console.error("Could not start music:", err));
+            }
+
             const b = boardRef.current;
 
             if (e.key === "ArrowLeft") {
@@ -148,7 +207,7 @@ export default function TetrisGame() {
             window.removeEventListener("keydown", handleKeyDown);
             window.removeEventListener("keyup", handleKeyUp);
         };
-    }, []);
+    }, [musicOn]);
 
     // Draw
     useEffect(() => {
@@ -219,8 +278,34 @@ export default function TetrisGame() {
 
     return (
         <div style={{ display: "grid", gap: 12 }}>
-            <div style={{ color: "black", fontFamily: "system-ui", fontSize: 16 }}>
-                Score: <strong>{score}</strong>
+            <div
+                style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    color: "#e5e7eb",
+                    fontFamily: "system-ui",
+                    fontSize: 16,
+                }}
+            >
+                <div>
+                    Score: <strong>{score}</strong>
+                </div>
+
+                <button
+                    onClick={toggleMusic}
+                    style={{
+                        padding: "6px 10px",
+                        borderRadius: 8,
+                        border: "1px solid #444",
+                        background: "#1f2937",
+                        color: "#e5e7eb",
+                        cursor: "pointer",
+                    }}
+                >
+                    {musicOn ? "Music: On" : "Music: Off"}
+                </button>
             </div>
 
             <canvas
