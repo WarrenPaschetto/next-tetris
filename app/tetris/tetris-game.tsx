@@ -261,19 +261,19 @@ export default function TetrisGame() {
         }
 
         // grid lines (optional)
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-        for (let x = 0; x <= COLS; x++) {
-            ctx.beginPath();
-            ctx.moveTo(x * CELL, 0);
-            ctx.lineTo(x * CELL, ROWS * CELL);
-            ctx.stroke();
-        }
-        for (let y = 0; y <= ROWS; y++) {
-            ctx.beginPath();
-            ctx.moveTo(0, y * CELL);
-            ctx.lineTo(COLS * CELL, y * CELL);
-            ctx.stroke();
-        }
+        //ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+        //for (let x = 0; x <= COLS; x++) {
+        //    ctx.beginPath();
+        //    ctx.moveTo(x * CELL, 0);
+        //    ctx.lineTo(x * CELL, ROWS * CELL);
+        //    ctx.stroke();
+        //}
+        //for (let y = 0; y <= ROWS; y++) {
+        //    ctx.beginPath();
+        //    ctx.moveTo(0, y * CELL);
+        //    ctx.lineTo(COLS * CELL, y * CELL);
+        //    ctx.stroke();
+        //}
     }, [board, piece]);
 
     return (
@@ -284,7 +284,7 @@ export default function TetrisGame() {
                     gap: 12,
                     alignItems: "center",
                     justifyContent: "space-between",
-                    color: "#e5e7eb",
+                    color: "#1f2937",
                     fontFamily: "system-ui",
                     fontSize: 16,
                 }}
